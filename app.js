@@ -1,19 +1,32 @@
+var startedSecond = new Date().getSeconds();
+var totalPointsFromStart = 90 + startedSecond % 10;
+
 var ChartArea = function(sceneSelector) {
 	var _this = this,
 		gradient = null,
 		areaPolygon = null,
 		line = null,
-		animationDuration = 300,
+		animationDuration = 900,
 		sceneHeight = 0,
 		animationEnabled = false,
 		sceneWidth = 0,
 		scene = null,
 		globalPoints = [],
 		$sceneContainer = getContainerObj(),
-		marginTop = 100,
-		marginBottom = 100,
+		marginTop = 50,
+		marginBottom = 50,
 		marginLeft = 0,
-		marginRight = 200,
+		marginRight = 100,
+		gridGroup = null,
+		gridLevelGroup = null,
+		gridLines = [],
+		gridLevelLines = [],
+		expirationSeconds = 10,
+		currentLevelLine = null,
+		currentLevelCircleGroup = null,
+		cutOldPoints = false,
+		start = 0,
+		counter = startedSecond % expirationSeconds,
 		dataDimensions = {
 			maxX: 0,
 			maxY: 0,
@@ -33,6 +46,7 @@ var ChartArea = function(sceneSelector) {
 			gradient = createAreaGradient();
 			areaPolygon = createAreaPolygon();
 			line = createLine();
+			gridGroup = createGridGroup();
 		}
 	}
 
@@ -111,8 +125,213 @@ var ChartArea = function(sceneSelector) {
 		return newPoints;
 	}
 
+	function createGridGroup() {
+		return scene.group();
+	}
+
+	function addZero(i) {
+		if(i < 10) {
+			i = "0" + i;
+		}
+
+		return i;
+	}
+
+	function humanizeTime(time) {
+		return addZero(time.getHours()) + ':' +
+			addZero(time.getMinutes()) + ':' +
+			addZero(time.getSeconds());
+	}
+
+	function getCurrentLevel() {
+		return globalPoints[globalPoints.length - 1];
+	}
+
+	function drawCurrentLevel() {
+		var currentLevel = getCurrentLevel(),
+			time = currentLevel[0],
+			level = currentLevel[1],
+			y = levelToY(level) - 0.5,
+			x = timeToX(time),
+			circleInnerRadius = 5,
+			circleOuterRadius = 10,
+			circleDotRadius = 2;
+
+		if(!currentLevelLine) {
+			currentLevelLine = scene.line(0, 0, sceneWidth, 0).stroke({
+				width: 1,
+				color: '#4186BA'
+			});
+
+			currentLevelLine.transform({
+				y: y
+			});
+
+			currentLevelCircleGroup = scene.group();
+
+			currentLevelCircleGroup.transform({
+				x: x,
+				y: y
+			});
+
+			var circleOuter = scene.circle(circleOuterRadius * 2).fill({
+				color: 'RGBA(247, 252, 255, 1)'
+			}).opacity(0.1);
+
+			circleOuter.transform({
+				x: -circleOuterRadius,
+				y: -circleOuterRadius
+			});
+
+			var circleInner = scene.circle(circleInnerRadius * 2).fill({
+				color: '#F7FCFF'
+			});
+
+			circleInner.transform({
+				x: -circleInnerRadius,
+				y: -circleInnerRadius
+			});
+
+			var circleDot = scene.circle(circleDotRadius * 2).fill({
+				color: '#528FCC'
+			});
+
+			circleDot.transform({
+				x: -circleDotRadius,
+				y: -circleDotRadius
+			});
+
+			currentLevelCircleGroup.add(circleOuter);
+			currentLevelCircleGroup.add(circleInner);
+			currentLevelCircleGroup.add(circleDot);
+		} else {
+			currentLevelLine.animate(getAnimationDuration()).transform({
+				y: y,
+			});
+
+			currentLevelCircleGroup.animate(getAnimationDuration()).transform({
+				x: x,
+				y: y
+			});
+
+			currentLevelCircleGroup.children()[0]
+				.animate(getAnimationDuration() / 4)
+				.opacity(0.2)
+				.radius(circleOuterRadius * 1.4);
+
+			setTimeout(function() {
+				currentLevelCircleGroup.children()[0]
+					.animate(getAnimationDuration() / 2)
+					.opacity(0.1)
+					.radius(circleOuterRadius);
+			}, getAnimationDuration() / 4);
+		}
+	}
+
+	function drawLevels() {
+		if(gridLevelLines.length === 0) {
+			_.times(5, function(i) {
+				var y = sceneHeight / 5 * i + 0.5;
+				var x = sceneWidth - 80;
+
+				var line = scene.line(0, y, x, y).stroke({
+					width: 1,
+					color: 'RGBA(194, 205, 209, .1)'
+				});
+
+				var level = yToLevel(y).toFixed(6);
+				var text = scene.text(level)
+					.move(x + 10, y - 4.5)
+					.font({
+						family: 'Roboto',
+						weight: 100,
+						size: 12,
+						anchor: 'left'
+					})
+					.fill({
+						color: 'RGBA(194, 205, 209, .8)'
+					});
+
+				gridLevelLines.push({
+					line: line,
+					text: text
+				});
+			});
+		} else {
+			_.each(gridLevelLines, function(line, i) {
+				var y = sceneHeight / 5 * i + 0.5;
+				var x = sceneWidth - 80;
+				var level = yToLevel(y).toFixed(6);
+
+				line.text.text(level);
+			});
+		}
+	}
+
+	function drawGrid(points) {
+		var time = 0;
+		var timeStep = 30;
+
+		var dt = new Date();
+		var dts = dt.setSeconds(dt.getSeconds() - totalPointsFromStart);
+
+		if(gridLines.length === 0) {
+			_.times(30, function() {
+				var x = timeToX(time) + 0.5;
+
+				var line = scene.line(x, 0, x, sceneHeight - 25).stroke({
+					width: 1,
+					color: 'RGBA(194, 205, 209, .1)'
+				});
+
+				var timeMarker = humanizeTime(new Date(dts + time * 1000));
+
+				var text = scene.text(timeMarker)
+					.move(x, sceneHeight - 17)
+					.font({
+						family: 'Roboto',
+						weight: 100,
+						size: 12,
+						anchor: 'middle'
+					})
+					.fill({
+						color: 'RGBA(194, 205, 209, .8)'
+					});
+
+				gridLines.push({
+					line: line,
+					text: text,
+					x: x,
+					time: time
+				});
+
+				time += timeStep;
+			});
+		} else {
+			_.each(gridLines, function(line) {
+				var x = timeToX(0);
+
+				line.line.animate(getAnimationDuration()).transform({
+					x: x
+				});
+
+				line.text.animate(getAnimationDuration()).transform({
+					x: x
+				});
+			});
+		}
+	}
+
+	var griddr = false;
+
 	function draw(animate) {
+		calculateDimensions(globalPoints);
+
 		animationEnabled = animate;
+
+		drawGrid();
+		drawLevels();
+		drawCurrentLevel();
 
 		if(scene && globalPoints && globalPoints.length > 0) {
 			updateSceneDimensions();
@@ -121,6 +340,26 @@ var ChartArea = function(sceneSelector) {
 
 			drawLine(convertedPoints);
 			drawAreaPolygon(convertedPoints);
+
+			if(cutOldPoints) {
+				setTimeout(function() {
+					if(globalPoints.length > 90){
+						globalPoints = globalPoints.splice(globalPoints.length - 90, globalPoints.length - 1);
+
+						calculateDimensions(globalPoints);
+
+						animationEnabled = false;
+						cutOldPoints = false;
+
+						var convertedPoints = convertPoints(globalPoints);
+
+						start = 0;
+
+						drawLine(convertedPoints);
+						drawAreaPolygon(convertedPoints);
+					}
+				}, animationDuration);
+			}
 		}
 	}
 
@@ -144,7 +383,6 @@ var ChartArea = function(sceneSelector) {
 		var percent = x / (sceneWidth / 100),
 			time = dataDimensions.minX + (percent * dataDimensions.rangePercentX);
 
-
 		return time;
 	}
 
@@ -159,7 +397,7 @@ var ChartArea = function(sceneSelector) {
 		var timePercent = (time - dataDimensions.minX) / dataDimensions.rangePercentX,
 			widthPercent = (sceneWidth - marginRight - marginLeft) / 100;
 
-		return (widthPercent * timePercent) + marginLeft;
+		return(widthPercent * timePercent) + marginLeft;
 	}
 
 	function levelToY(level) {
@@ -169,7 +407,9 @@ var ChartArea = function(sceneSelector) {
 		return sceneHeight - (heightPercent * levelPercent) - marginBottom;
 	}
 
-	function calculateDimensions(points){
+	var pointsLength = 0;
+
+	function calculateDimensions(points) {
 		var maxX = 0,
 			maxY = 0,
 			minX = Infinity,
@@ -181,25 +421,38 @@ var ChartArea = function(sceneSelector) {
 			rangePercentX = 0,
 			rangePercentY = 0;
 
-		_.each(points, function(point){
-			if(point[0] > maxX){
-				maxX = point[0];
-			}
+		if(pointsLength === 0) {
+			pointsLength = points.length;
+		} else {
+			pointsLength++;
+		}
 
-			if(point[1] > maxY){
-				maxY = point[1];
+		counter++;
+
+		if(counter == expirationSeconds) {
+			cutOldPoints = true;
+			start += counter;
+			counter = 0;
+		}
+
+		_.each(points, function(point, i) {
+			if(i >= start) {
+				if(point[1] > maxY) {
+					maxY = point[1];
+				}
 			}
 		});
 
-		_.each(points, function(point){
-			if(point[0] < maxX && point[0] < minX){
-				minX = point[0];
-			}
-
-			if(point[1] < maxY && point[1] < minY){
-				minY = point[1];
+		_.each(points, function(point, i) {
+			if(i >= start) {
+				if(point[1] < maxY && point[1] < minY) {
+					minY = point[1];
+				}
 			}
 		});
+
+		minX = start;
+		maxX = 150 + start;
 
 		rangeX = maxX - minX;
 		rangeY = maxY - minY;
@@ -221,12 +474,12 @@ var ChartArea = function(sceneSelector) {
 
 	function addPoints(points) {
 		globalPoints = _.union(globalPoints, [points]);
-		calculateDimensions(globalPoints);
 	}
 
 	function resizeScene() {
 		if(scene) {
 			var dimensions = getSceneDimensions();
+
 			scene.size(dimensions.width, dimensions.height);
 			updateSceneDimensions();
 		}
@@ -251,23 +504,33 @@ $(window).on('resize', function() {
 
 var x = 0;
 
-_.times(100, function() {
-	x += 5;
+var getY = function() {
+	var r = _.random(0, 1);
 
+	var arr = [
+		_.random(_.random(_.random(0.121212, 0.121312), _.random(0.121312, 0.121332)), _.random(_.random(0.121334, 0.121354), _.random(0.121354, 0.121554)))
+	];
+
+	return arr[0];
+};
+
+_.times(totalPointsFromStart, function() {
 	chartArea.addPoints([
 		x,
-		_.random(_.random(_.random(0, 1000), _.random(0, 1000)), _.random(_.random(0, 1000), _.random(0, 1000)))
+		getY()
 	]);
+
+	x += 1;
 });
 
 chartArea.draw(false);
 
 setInterval(function() {
-	x += 5;
+	x += 1;
 
 	chartArea.addPoints([
 		x,
-		_.random(_.random(_.random(0, 1000), _.random(0, 1000)), _.random(_.random(0, 1000), _.random(0, 1000)))
+		getY()
 	]);
 
 	chartArea.draw(true);
