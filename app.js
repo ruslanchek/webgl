@@ -154,10 +154,78 @@ var ChartArea = function (sceneSelector) {
         return globalPoints[globalPoints.length - 1];
     }
 
-    function drawBets(){
-        _.each(bets, function(bet){
-            if(!bet.drawed){
+    function drawBets() {
+        _.each(bets, function (bet) {
+            var x = timeToX(bet.time);
+            var y = levelToY(bet.level) + 0.5;
 
+            if (!bet.drawGroup) {
+                var color = (bet.type === 1) ? '#45C672' : '#EC4D4E';
+
+                bet.drawGroup = scene.group();
+
+                var betLine = scene.line(0, 0, sceneWidth - 80, 0).stroke({
+                    width: 1,
+                    color: color
+                });
+
+                bet.drawGroup.add(betLine);
+
+                bet.drawGroup.transform({
+                    y: y
+                });
+
+                bet.drawArrowGroup = scene.group();
+
+                var betCircle = scene.circle(10).fill({
+                    color: '#272C33'
+                }).stroke({
+                    width: 3,
+                    color: color
+                });
+
+                betCircle.transform({
+                    x: -5,
+                    y: -5
+                });
+
+                var arrowPoints = [];
+
+                if(bet.type === 1){
+                    arrowPoints = [
+                        [-6, -2],
+                        [0, -12],
+                        [6, -2],
+                        [-6, -2]
+                    ];
+                }else{
+                    arrowPoints = [
+                        [-6, 2],
+                        [0, 12],
+                        [6, 2],
+                        [-6, 2]
+                    ];
+                }
+
+                var betTriangle = scene.polygon(arrowPoints).fill({
+                    color: color
+                });
+
+                bet.drawArrowGroup.add(betTriangle);
+                bet.drawArrowGroup.add(betCircle);
+                bet.drawArrowGroup.transform({
+                    y: y,
+                    x: x
+                });
+            } else {
+                bet.drawGroup.animate(getAnimationDuration()).transform({
+                    y: y
+                });
+
+                bet.drawArrowGroup.animate(getAnimationDuration()).transform({
+                    y: y,
+                    x: x
+                });
             }
         });
     }
@@ -514,6 +582,9 @@ var ChartArea = function (sceneSelector) {
             if (currentLevel == bet.level) {
                 bet.win = 2;
             }
+
+            bet.drawGroup.remove();
+            bet.drawArrowGroup.remove();
         });
 
         console.log('bets closed', bets);
@@ -595,25 +666,29 @@ var ChartArea = function (sceneSelector) {
     }
 
     function setBet(type, amount) {
-        var bet = {
-            drawed: false,
-            amount: amount,
-            time: currentPoint[0],
-            level: currentPoint[1],
-            type: 0,
-            win: -1
-        };
+        var level = currentPoint[1];
 
-        if (!currentPoint) {
-            return;
-        }
+        if (level < 120 && bets.length < 5) {
+            var bet = {
+                drawGroup: null,
+                amount: amount,
+                time: currentPoint[0],
+                level: level,
+                type: 0,
+                win: -1
+            };
 
-        if (type === 1) { // Call
-            bet.type = 1;
-        }
+            if (!currentPoint) {
+                return;
+            }
 
-        if (bets.length < 5) {
+            if (type === 1) { // Call
+                bet.type = 1;
+            }
+
             bets.push(bet);
+        } else {
+            console.log('cant set a bet');
         }
     }
 
@@ -640,17 +715,21 @@ var ChartArea = function (sceneSelector) {
 
 var chartArea = new ChartArea('#scene');
 
-$(window).on('resize', function () {
-    chartArea.resizeScene();
-});
 
 var x = 0;
 
 var getY = function () {
-    var r = _.random(0, 1);
-
     var arr = [
-        _.random(_.random(_.random(0.121212, 0.121312), _.random(0.121312, 0.121332)), _.random(_.random(0.121334, 0.121354), _.random(0.121354, 0.121554)))
+        _.random(
+            _.random(
+                _.random(0.121212, 0.121312),
+                _.random(0.121312, 0.121332)
+            ),
+            _.random(
+                _.random(0.121334, 0.121354),
+                _.random(0.121354, 0.121554)
+            )
+        )
     ];
 
     return arr[0];
@@ -678,10 +757,19 @@ setInterval(function () {
     chartArea.draw(true);
 }, 1000);
 
+
+setTimeout(function () {
+    chartArea.setBet(1, 20);
+}, 4000);
+
+setTimeout(function () {
+    chartArea.setBet(0, 10);
+}, 5000);
+
 setTimeout(function () {
     chartArea.setBet(1, 100);
-}, 3000);
+}, 6000);
 
 setTimeout(function () {
     chartArea.setBet(0, 50);
-}, 4000);
+}, 8000);
