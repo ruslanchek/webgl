@@ -27,6 +27,7 @@ var ChartArea = function (sceneSelector) {
         currentLevelCircleGroup = null,
         cutOldPoints = false,
         currentPoint = null,
+        expIteration = 1,
         start = 0,
         bets = [],
         counter = startedSecond % expirationSeconds,
@@ -67,13 +68,13 @@ var ChartArea = function (sceneSelector) {
             stop.at({
                 offset: 0,
                 color: '#1594D1',
-                opacity: 0.3
+                opacity: 0.4
             });
 
             stop.at({
                 offset: 1,
                 color: '#1594D1',
-                opacity: 0.075
+                opacity: 0.0
             });
         });
 
@@ -253,7 +254,7 @@ var ChartArea = function (sceneSelector) {
                 .font({
                     family: 'Roboto',
                     weight: 100,
-                    size: 11,
+                    size: 10,
                     'text-anchor': 'end'
                 })
                 .fill({
@@ -265,7 +266,7 @@ var ChartArea = function (sceneSelector) {
                 .font({
                     family: 'Roboto',
                     weight: 100,
-                    size: 11,
+                    size: 10,
                     'text-anchor': 'end'
                 })
                 .fill({
@@ -397,11 +398,11 @@ var ChartArea = function (sceneSelector) {
 
                 var level = yToLevel(y).toFixed(6);
                 var text = scene.text(level)
-                    .move(x + 10, y - 4.5)
+                    .move(x + 6, y - 2.5)
                     .font({
                         family: 'Roboto',
                         weight: 100,
-                        size: 12,
+                        size: 10,
                         anchor: 'left'
                     })
                     .fill({
@@ -431,7 +432,7 @@ var ChartArea = function (sceneSelector) {
         var dts = dt.setSeconds(dt.getSeconds() - totalPointsFromStart);
 
         if (gridLines.length === 0) {
-            _.times(50, function () {
+            _.times(50, function (i) {
                 var x = timeToX(time) - 0.5;
 
                 var line = scene.line(x, 0, x, sceneHeight - 25).stroke({
@@ -446,12 +447,17 @@ var ChartArea = function (sceneSelector) {
                     .font({
                         family: 'Roboto',
                         weight: 100,
-                        size: 12,
+                        size: 10,
                         anchor: 'middle'
                     })
                     .fill({
                         color: 'RGBA(194, 205, 209, .8)'
                     });
+
+                if(i > 4 + expIteration){
+                    line.opacity(0);
+                    text.opacity(0);
+                }
 
                 gridLines.push({
                     line: line,
@@ -463,16 +469,28 @@ var ChartArea = function (sceneSelector) {
                 time += timeStep;
             });
         } else {
-            _.each(gridLines, function (line) {
+            _.each(gridLines, function (line, i) {
                 var x = timeToX(0);
 
-                line.line.animate(getAnimationDuration()).transform({
-                    x: x
-                });
+                if(i + 1 < expIteration){
+                    setTimeout(function(){
+                        line.line.remove();
+                        line.text.remove();
+                    }, getAnimationDuration());
+                }else{
+                    line.line.animate(getAnimationDuration()).transform({
+                        x: x
+                    });
 
-                line.text.animate(getAnimationDuration()).transform({
-                    x: x
-                });
+                    line.text.animate(getAnimationDuration()).transform({
+                        x: x
+                    });
+                }
+
+                if(i >= 3 + expIteration && i <= 4 + expIteration){
+                    line.line.opacity(1);
+                    line.text.opacity(1);
+                }
             });
         }
     }
@@ -616,6 +634,7 @@ var ChartArea = function (sceneSelector) {
             cutOldPoints = true;
             start += counter;
             counter = 0;
+            expIteration++;
 
             if (multiplier > 1) {
                 betClear();
@@ -758,18 +777,18 @@ setInterval(function () {
 }, 1000);
 
 
-setTimeout(function () {
-    chartArea.setBet(1, 20);
-}, 4000);
-
-setTimeout(function () {
-    chartArea.setBet(0, 10);
-}, 5000);
-
-setTimeout(function () {
-    chartArea.setBet(1, 100);
-}, 6000);
-
-setTimeout(function () {
-    chartArea.setBet(0, 50);
-}, 8000);
+//setTimeout(function () {
+//    chartArea.setBet(1, 20);
+//}, 4000);
+//
+//setTimeout(function () {
+//    chartArea.setBet(0, 10);
+//}, 5000);
+//
+//setTimeout(function () {
+//    chartArea.setBet(1, 100);
+//}, 6000);
+//
+//setTimeout(function () {
+//    chartArea.setBet(0, 50);
+//}, 8000);
